@@ -1,109 +1,63 @@
 package main
 
 import (
-	"context"
-	"fmt"
+	"bytes"
+	"encoding/json"
+	"log"
+	"math/rand"
+	"net/http"
 	"time"
 
 	server "github.com/7anekaha/go-logingestor/api/server"
 )
 
 func main() {
-	// Create log entries with different timestamps
-	log1 := server.Log{
-		Level:      "INFO",
-		Message:    "This is a log message",
-		ResourceId: "1234",
-		Timestamp:  parseTime("2023-09-15T08:00:00Z"),
-		TraceId:    "trace-1234",
-		SpanId:     "span-1234",
-		Commit:     "abc123",
-		Metadata: server.Metadata{
-			ParentResourceId: "5678",
-		},
-	}
-	log2 := server.Log{
-		Level:      "ERROR",
-		Message:    "This is an error message",
-		ResourceId: "5678",
-		Timestamp:  parseTime("2023-09-16T09:30:00Z"),
-		TraceId:    "trace-5678",
-		SpanId:     "span-5678",
-		Commit:     "def456",
-		Metadata: server.Metadata{
-			ParentResourceId: "9012",
-		},
-	}
-	log3 := server.Log{
-		Level:      "INFO",
-		Message:    "This is another log message",
-		ResourceId: "9012",
-		Timestamp:  parseTime("2023-09-17T11:45:00Z"),
-		TraceId:    "trace-9012",
-		SpanId:     "span-9012",
-		Commit:     "ghi789",
-		Metadata: server.Metadata{
-			ParentResourceId: "3456",
-		},
-	}
-	log4 := server.Log{
-		Level:      "WARN",
-		Message:    "This is a warning message",
-		ResourceId: "3456",
-		Timestamp:  parseTime("2023-09-18T14:20:00Z"),
-		TraceId:    "trace-3456",
-		SpanId:     "span-3456",
-		Commit:     "jkl012",
-		Metadata: server.Metadata{
-			ParentResourceId: "7890",
-		},
-	}
-	log5 := server.Log{
-		Level:      "DEBUG",
-		Message:    "This is a debug message",
-		ResourceId: "7890",
-		Timestamp:  parseTime("2023-09-19T16:55:00Z"),
-		TraceId:    "trace-7890",
-		SpanId:     "span-7890",
-		Commit:     "mno345",
-		Metadata: server.Metadata{
-			ParentResourceId: "0123",
-		},
-	}
 
-	// Connect to the database
-	mongoConfig := server.NewMongoConfig(
-		"mongodb://nico:secret@localhost:27017",
-		10,
-		50,
-		30,
-	)
+	levels := []string{"INFO", "ERROR", "WARN", "DEBUG"}
+	messages := []string{"This is a message 1", "This is a message 2", "This is a message 3", "This is a debug message"}
 
-	client, cancel, err := server.NewMongoClient(mongoConfig)
-	if err != nil {
-		panic("error connecting to mongodb")
-	}
+	// iterate 100 times to populate the database
+	for i := 0; i < 100; i++ {
 
-	defer func() {
-		cancel()
-		if err := client.Disconnect(context.Background()); err != nil {
-			panic("mongodb disconnect error")
+		// 1000 log entries
+		for j := 0; j < 1000; j++ {
+			// Create log entries with different timestamps
+			logReq := server.Log{
+				Level:      levels[rand.Intn(4)],
+				Message:    messages[rand.Intn(4)],
+				ResourceId: generateRandomStringNumber(4),
+				Timestamp:  time.Now(),
+				TraceId:    "trace-" + generateRandomStringNumber(4),
+				SpanId:     "span-" + generateRandomStringNumber(4),
+				Commit:     generateRandomStringNumber(6),
+				Metadata: server.Metadata{
+					ParentResourceId: generateRandomStringNumber(4),
+				},
+			}
+			jsonLogReq, err := json.Marshal(logReq)
+			if err != nil {
+				panic("error marshalling log request")
+			}
+
+			res, err := http.Post("http://localhost:3000/add", "application/json", bytes.NewBuffer(jsonLogReq))
+			if err != nil {
+				panic("error posting log request")
+			}
+			log.Println("Status code: ", res.StatusCode)
+
+			timeToSleep := time.Duration(rand.Intn(200)) * time.Millisecond
+
+			time.Sleep(timeToSleep)
 		}
-	}()
+	}
 
-	repo := server.NewMongoRepository(client)
-	repo.Add(context.Background(), log1)
-	repo.Add(context.Background(), log2)
-	repo.Add(context.Background(), log3)
-	repo.Add(context.Background(), log4)
-	repo.Add(context.Background(), log5)
 }
 
-// parseTime parses a time string in RFC3339 format and returns a time.Time object
-func parseTime(value string) time.Time {
-	t, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		panic(fmt.Sprintf("error parsing time: %v", err))
+func generateRandomStringNumber(n int) string {
+	const letters = "1234567890"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
 	}
-	return t
+	return string(b)
 }
