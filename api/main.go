@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	internal "github.com/7anekaha/go-logingestor/api/server"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -60,7 +61,42 @@ func main() {
 	repo := internal.NewMongoRepository(
 		client,
 	)
-	server := internal.NewServer(repo)
+
+
+
+	// add instrumentation
+	// reg := prometheus.NewRegistry()
+	requestCountAdd := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "request_count_add",
+		Help:      "Number of requests for add",
+		Subsystem: "logingestor",
+		Namespace: "api",
+	})
+
+	requestCountGet := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "request_count_get",
+		Help:      "Number of requests for get",
+		Subsystem: "logingestor",
+		Namespace: "api",
+	})
+
+	requestLatency := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:      "request_latency",
+		Help:      "Request latency",
+		Subsystem: "logingestor",
+		Namespace: "api",
+	})
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(requestCountAdd)
+	reg.MustRegister(requestCountGet)
+	reg.MustRegister(requestLatency)
+
+	service := internal.NewService(repo)
+	service = internal.NewInstrumentation(requestLatency, requestCountAdd, requestCountGet)(service)
+	
+
+	server := internal.NewServer(service, reg)
+
 
 	go func() {
 		if err := server.Start(); err != nil {

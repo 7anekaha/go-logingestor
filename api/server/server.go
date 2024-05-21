@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -19,12 +21,14 @@ const (
 var validate *validator.Validate
 
 type server struct {
-	service Service
+	service Service	
+	register *prometheus.Registry
 }
 
-func NewServer(service Service) *server {
+func NewServer(service Service, register *prometheus.Registry) *server {
 	return &server{
 		service: service,
+		register : register,
 	}
 }
 
@@ -76,6 +80,7 @@ func (s *server) Start() error {
 
 	mux.HandleFunc("POST /add", s.AddHandler)
 	mux.HandleFunc("GET /", s.GetAllHandler)
+	mux.Handle("GET /metrics", promhttp.HandlerFor(s.register, promhttp.HandlerOpts{}))
 	fmt.Println("Server is listening on port 3000")
 
 	return http.ListenAndServe(":3000", mux)
