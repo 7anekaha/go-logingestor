@@ -17,6 +17,39 @@ services:
       - 3000:3000
     depends_on:
       - db
-  
+  prometheus:
+    image: prom/prometheus
+    container_name: test-prometheus
+    restart: always
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+  mongodb-exporter:
+    image: bitnami/mongodb-exporter
+    container_name: test-mongodb-exporter
+    restart: always
+    ports:
+      - 9216:9216
+    environment:
+      - MONGODB_URI=mongodb://nico:secret@db:27017
+      - MONGODB_EXPORTER_ENABLE_ADMIN_COMMANDS=true
+  node-exporter:
+    image: prom/node-exporter
+    container_name: test-node-exporter
+    restart: always
+    ports:
+      - 9100:9100
+    volumes:
+      - /proc:/host/proc:ro
+  grafana:
+    image: grafana/grafana
+    container_name: test-grafana
+    restart: always
+    ports:
+      - 3001:3000
+
     
  
